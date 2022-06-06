@@ -1,0 +1,6 @@
+.idea/
+venv/
+__pycahe__/
+app/config.json
+docker-compose_ne_na_tachku.yml
+__pycache__/
