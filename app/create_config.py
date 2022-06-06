@@ -1,6 +1,7 @@
 import json
 from encryption import create_encrypted_key
 
+
 token = input('Введите токен бота:')
 password = create_encrypted_key()
 dictionary = {

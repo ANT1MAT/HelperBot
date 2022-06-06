@@ -3,7 +3,7 @@ from models import users, technique, new_shop, info_open, meta
 from sqlalchemy.orm import sessionmaker
 from encryption import create_hash, decode_hash
 
-engine = create_engine('postgresql://habrpguser:pgpwd4habr@pg_db/habrdb')
+engine = create_engine('sqlite:///database/database.db')
 conn = engine.connect()
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -21,6 +21,10 @@ async def user_status_check(user_id):
         return False
 
 
+async def get_user_id(username):
+    return session.query(users.c.user_id).where(users.c.user_name == username).all()[0]['user_id']
+
+
 async def add_user(user_id, user_name):
     if await check_user(user_id) is False:
         ins = users.insert().values(
@@ -30,17 +34,19 @@ async def add_user(user_id, user_name):
         conn.execute(ins)
 
 
-async def save_technique(address, product):
+async def save_technique(data: dict):
     ins = technique.insert().values(
-        address=address,
-        product=product,
+        address=data.get('address'),
+        product=repr(data.get('product')),
         status=0,
-        accesses_user=4
+        accesses_user=4,
+        stock=data.get('stock'),
+        created_task_user=data.get('created_task_user')
     )
     conn.execute(ins)
 
 
-async def save_new_shop(data):
+async def save_new_shop(data: dict):
     ins = new_shop.insert().values(
         address=data.get('address'),
         open_date=data.get('open_date'),
@@ -48,12 +54,16 @@ async def save_new_shop(data):
         hg_date=data.get('hg_date'),
         goods_date=data.get('goods_date'),
         status=0,
-        accesses_user=repr(data.get('status'))[1:-1]
+        accesses_user=repr(data.get('status'))[1:-1],
+        stock_hg=data.get('stock_hg'),
+        stock_goods=data.get('stock_goods'),
+        hg_schedule=data.get('hg_schedule'),
+        created_task_user=data.get('created_task_user')
     )
     conn.execute(ins)
 
 
-async def save_info(data):
+async def save_info(data: dict):
     ins = info_open.insert().values(
         address=data.get('address'),
         date=data.get('date'),
@@ -70,7 +80,9 @@ async def save_info(data):
         photo_screen=data.get('photo_screen'),
         photo_household=data.get('photo_household'),
         status=0,
-        accesses_user=repr(data.get('status'))[1:-1]
+        accesses_user=repr(data.get('status'))[1:-1],
+        created_task_user=data.get('created_task_user')
+
     )
     conn.execute(ins)
 
@@ -113,21 +125,41 @@ async def search_completed_task_list(user_id):
 async def search_description(table, task_id):
     if table == 'technique':
         result = session.query(technique).where(technique.c.id == task_id).all()[0]
-        answer = f'В магазин {result["address"]} требуется:\n'
+        answer = ''
+        if result['stock'] == 'stock_msk':
+            answer += '[МСК]'
+        else:
+            answer += '[СПб]'
+        answer += f'В магазин {result["address"]} требуется:\n'
         products = eval(result["product"])
         for i, prod in enumerate(products, start=1):
             answer += f'{i}. {prod}\n'
-        return answer, result['status'], None
+        answer += f'Задачу создал @{result["created_task_user"]}\n'
+        #if result['status'] == 1:
+            #answer += f'Задачу'
+        return answer, result['status'], None, result['created_task_user']
     elif table == 'new_shop':
+        answer = ''
         result = session.query(new_shop).where(new_shop.c.id == task_id).all()[0]
-        answer = (f'Магазин: {result["address"]}\n'
+        if result['stock_hg']:
+            if result['stock_hg'] == 'stock_msk':
+                answer += '[Хозка с МСК]'
+            else:
+                answer += '[Хозка с СПб]'
+        if result['stock_goods']:
+            if result['stock_goods'] == 'stock_msk':
+                answer += '[Товары с МСК]'
+            else:
+                answer += '[Товары с СПб]'
+        answer += (f'Магазин: {result["address"]}\n'
                   f'Планируемая дата открытия: {result["open_date"]}\n')
         if result["hg_entity"] and result["hg_date"]:
             answer += (f'Требуются хозяйственные товары для {result["hg_entity"]}'
                        f' к {result["hg_date"]}\n')
         if result["goods_date"]:
-            answer += f'Требуется товар к {result["goods_date"]}'
-        return answer, result['status'], None
+            answer += f'Требуется товар к {result["goods_date"]}\n'
+        answer += f'Задачу создал @{result["created_task_user"]}\n'
+        return answer, result['status'], None, result['created_task_user']
     elif table == 'info':
         result = session.query(info_open).where(info_open.c.id == task_id).all()[0]
         answer = (f'{result["address"]} будет открыт '
@@ -149,18 +181,23 @@ async def search_description(table, task_id):
                        f'СНИЛС: {decode_hash(result["snils_2"])}\n')
         if result["photo_markup"] and result["photo_screen"] and result["photo_household"]:
             photo = [result["photo_markup"], result["photo_screen"], result["photo_household"]]
-            return answer, result['status'], photo
-        return answer, result['status'], None
+            answer += f'Задачу создал @{result["created_task_user"]}\n'
+            return answer, result['status'], photo, result['created_task_user']
+        answer += f'Задачу создал @{result["created_task_user"]}\n'
+        return answer, result['status'], None, result['created_task_user']
 
 
-async def complete_task_query(table, task_id, status):
+async def change_task_query(table, task_id, status, user_name=None):
     if table == 'technique':
-        session.query(technique).where(technique.c.id == task_id).update({'status': status})
+        session.query(technique).where(technique.c.id == task_id).update({'status': status,
+                                                                          'closed_task_user': user_name})
         session.commit()
     elif table == 'new_shop':
-        session.query(new_shop).where(new_shop.c.id == task_id).update({'status': status})
+        session.query(new_shop).where(new_shop.c.id == task_id).update({'status': status,
+                                                                        'closed_task_user': user_name})
         session.commit()
     elif table == 'info':
-        session.query(info_open).where(info_open.c.id == task_id).update({'status': status})
+        session.query(info_open).where(info_open.c.id == task_id).update({'status': status,
+                                                                          'closed_task_user': user_name})
         session.commit()
 

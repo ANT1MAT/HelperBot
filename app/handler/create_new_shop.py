@@ -6,6 +6,7 @@ from aiogram.dispatcher import FSMContext
 from database_query import save_new_shop, select_users
 from handler.start import start_message
 from aiogram.types import ReplyKeyboardRemove
+from buttons.menu_buttons import stock_kb
 
 
 @dp.callback_query_handler(lambda c: c.data == 'new_shop')
@@ -33,10 +34,30 @@ async def set_others(message: types.Message, state: FSMContext):
                          f'Планируемая дата открытия: {data["open_date"]}', reply_markup=others_kb)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'household_goods', state=NewShop.new_shop_choice)
-async def add_household_goods(callback_query: types.callback_query, state: FSMContext):
+@dp.callback_query_handler(lambda c: c.data == 'household_goods' or c.data == 'goods', state=NewShop.new_shop_choice)
+async def set_stock(callback_query: types.callback_query):
     await bot.answer_callback_query(callback_query.id)
-    await bot.send_message(callback_query.from_user.id, 'Какое юридическое лицо будет по данному адресу?', reply_markup=cancel_kb)
+    await bot.send_message(callback_query.from_user.id, 'Выберете склад отправитель:', reply_markup=stock_kb)
+    if callback_query.data == 'household_goods':
+        await NewShop.household_goods_stock.set()
+    else:
+        await NewShop.goods_stock.set()
+
+
+@dp.callback_query_handler(lambda c: c.data == 'stock_spb' or c.data == 'stock_msk',
+                           state=NewShop.household_goods_stock)
+async def set_schedule(callback_query: types.callback_query, state: FSMContext):
+    await bot.answer_callback_query(callback_query.id)
+    await state.update_data(stock_hg=callback_query.data)
+    await bot.send_message(callback_query.from_user.id, 'Какой график работы будет по данному адресу?',
+                           reply_markup=cancel_kb)
+    await NewShop.next()
+
+
+@dp.message_handler(state=NewShop.household_goods_schedule)
+async def add_household_goods(message: types.Message, state: FSMContext):
+    await message.answer('Какое юридическое лицо будет по данному адресу?',reply_markup=cancel_kb)
+    await state.update_data(schedule=message.text)
     await NewShop.next()
 
 
@@ -60,17 +81,32 @@ async def show_total(message: types.Message, state: FSMContext):
     if data.get('hg_entity') and data.get('hg_date'):
         answer += (f'Требуются хозяйственные товары для {data["hg_entity"]}'
                    f' к {data["hg_date"]}\n')
+    if data.get('schedule'):
+        answer += (f'График работы магазина:\n'
+                  f'{data["schedule"]}\n')
+    if data.get('stock_hg'):
+        if data.get('stock_hg') == 'stock_msk':
+            answer += f'Хозяйственные товары поедут с МСК\n'
+        else:
+            answer += f'Хозяйственные товары поедут с СПб\n'
     if data.get('goods_date'):
-        answer += f'Требуется товар к {data["goods_date"]}'
+        answer += f'Требуется товар к {data["goods_date"]}\n'
+    if data.get('stock_goods'):
+        if data.get('stock_goods') == 'stock_msk':
+            answer += f'Товар поедет с МСК'
+        else:
+            answer += f'Товар поедет с СПб'
+
     await message.answer(answer, reply_markup=others_kb)
     await NewShop.new_shop_choice.set()
 
 
-@dp.callback_query_handler(lambda c: c.data == 'goods', state=NewShop.new_shop_choice)
-async def add_goods_date(callback_query: types.callback_query):
+@dp.callback_query_handler(lambda c: c.data == 'stock_spb' or c.data == 'stock_msk', state=NewShop.goods_stock)
+async def add_goods_date(callback_query: types.callback_query, state: FSMContext):
     await bot.answer_callback_query(callback_query.id)
+    await state.update_data(stock_goods=callback_query.data)
     await bot.send_message(callback_query.from_user.id, 'Какому числу нужен товар?', reply_markup=cancel_kb)
-    await NewShop.goods_data.set()
+    await NewShop.next()
 
 
 @dp.message_handler(state=NewShop.goods_data)
@@ -92,11 +128,29 @@ async def check_correctness(callback_query: types.callback_query, state: FSMCont
     if data.get('hg_entity') and data.get('hg_date'):
         answer += (f'Требуются хозяйственные товары для {data["hg_entity"]}'
                    f' к {data["hg_date"]}\n')
-    if data.get('goods_date'):
-        answer += f'Требуется товар к {data["goods_date"]}'
         status.add(3)
+    if data.get('schedule'):
+        answer += (f'График работы магазина:\n'
+                  f'{data["schedule"]}\n')
+    if data.get('stock_hg'):
+        if data.get('stock_hg') == 'stock_msk':
+            answer += f'Хозяйственные товары поедут с МСК\n'
+            status.add(8)
+        else:
+            answer += f'Хозяйственные товары поедут с СПб\n'
+            status.add(7)
+    if data.get('goods_date'):
+        answer += f'Требуется товар к {data["goods_date"]}\n'
+    if data.get('stock_goods'):
+        if data.get('stock_goods') == 'stock_msk':
+            answer += f'Товар поедет с МСК'
+            status.add(6)
+        else:
+            answer += f'Товар поедет с СПб'
+            status.add(5)
     await state.update_data(answer=answer)
     await state.update_data(status=status)
+    await state.update_data(created_task_user=callback_query.from_user.username)
     await bot.send_message(callback_query.from_user.id, answer, reply_markup=check_kb)
     await NewShop.new_shop_finish.set()
 

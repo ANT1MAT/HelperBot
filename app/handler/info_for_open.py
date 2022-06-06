@@ -188,6 +188,7 @@ async def info_finish(user_id: None, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data == 'finish', state=[InfoStates.info_finish, InfoStates.info_total])
 async def save_data(callback_query: types.callback_query, state: FSMContext):
     await state.update_data(status=[USER_STATUS])
+    await state.update_data(created_task_user=callback_query.from_user.username)
     data = await state.get_data()
     answer = data['answer']
     if data.get('passport_1') and data.get('snils_1'):

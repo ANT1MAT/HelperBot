@@ -14,7 +14,7 @@ async def start_message(message: types.Message):
                                                          f'/start - начальное меню,\n'
                                                          f'/cancel - отмена всех действий.',
                                           reply_markup=menu_kb_user)
-        if user_status == 2 or user_status == 3:
+        if user_status in [2, 3, 5, 6, 7, 8]:
             await bot.send_message(message.from_user.id, f'Привет, {message.from_user.full_name}.\n'
                                                          f'Команды, которые понимает бот:\n'
                                                          f'/start - начальное меню,\n'
