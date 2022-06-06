@@ -3,7 +3,7 @@ from models import users, technique, new_shop, info_open, meta
 from sqlalchemy.orm import sessionmaker
 from encryption import create_hash, decode_hash
 
-engine = create_engine('sqlite:///database/database.db')
+engine = create_engine('postgresql://habrpguser:pgpwd4habr@pg_db/habrdb')
 conn = engine.connect()
 Session = sessionmaker(bind=engine)
 session = Session()
