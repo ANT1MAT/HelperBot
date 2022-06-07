@@ -184,7 +184,8 @@ async def close_new_shop_task(callback_query: types.callback_query, state: FSMCo
     await change_task_query(table, task_id, 1, callback_query.from_user.username, status_name)
     await bot.send_message(creator_task_user_id, f'Задача ниже была закрыта.\n'
                                                  f'Задачу закрыл: @{callback_query.from_user.username}')
-    await bot.send_message(creator_task_user_id, data['message'])
+    message = await search_description(table, task_id, callback_query.from_user.id)
+    await bot.send_message(creator_task_user_id, message[0])
     await state.finish()
     await bot.send_message(callback_query.from_user.id, 'Задача закрыта')
     await start_message(message=callback_query)
