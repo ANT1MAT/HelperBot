@@ -12,8 +12,8 @@ technique = Table(
     Column('status', Integer),
     Column('accesses_user', String),
     Column('stock', String),
-    Column('created_task_user', Integer),
-    Column('closed_task_user', Integer)
+    Column('created_task_user', String),
+    Column('closed_task_user', String)
 )
 
 
@@ -44,8 +44,8 @@ info_open = Table(
     Column('photo_household', String),
     Column('status', Integer),
     Column('accesses_user', String),
-    Column('created_task_user', Integer),
-    Column('closed_task_user', Integer)
+    Column('created_task_user', String),
+    Column('closed_task_user', String)
 )
 
 
@@ -62,7 +62,7 @@ new_shop = Table(
     Column('accesses_user', String),
     Column('stock_hg', String),
     Column('stock_goods', String),
-    Column('created_task_user', Integer),
-    Column('closed_task_user', Integer)
+    Column('created_task_user', String),
+    Column('closed_task_user', String)
 )
 
