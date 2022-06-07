@@ -6,6 +6,7 @@ from buttons.info_for_open_buttons import total_kb, employee_kb, finish_kb
 from aiogram.types.input_media import InputMediaPhoto
 from database_query import save_info, select_users
 from handler.start import start_message
+from aiogram.types.message import ContentType
 
 
 USER_STATUS = 4
@@ -88,7 +89,7 @@ async def save_area(message: types.Message, state: FSMContext):
 
 
 @dp.message_handler(state=InfoStates.info_passport)
-async def set_passport(user_id: None, state: FSMContext):
+async def set_passport(user_id=None):
     await bot.send_message(user_id, 'Отправьте серию и номер паспорта сотрудника(без пробелов и тире)',
                            reply_markup=cancel_kb)
     await InfoStates.next()
@@ -132,26 +133,32 @@ async def switch_state(callback_query: types.callback_query, state: FSMContext):
 
 
 async def set_markup(user_id: None):
-    await bot.send_message(user_id, 'Отпарвьте фото разметки на полу (как минимум 2 полосы в кадре',
+    await bot.send_message(user_id, 'Отпарвьте фото разметки на полу (как минимум 2 полосы в кадре)',
                            reply_markup=cancel_kb)
 
 
-@dp.message_handler(content_types=['photo'], state=InfoStates.info_photo_markup)
+@dp.message_handler(content_types=ContentType.PHOTO, state=InfoStates.info_photo_markup)
 async def set_screen(message: types.Message, state: FSMContext):
+    if message.media_group_id:
+        return await message.answer('Отправте только одно фото')
     await state.update_data(photo_markup=message.photo[BEST_RESOLUTION]['file_id'])
     await message.answer('Отправьте фото защитного экрана (его должно быть видно полность)', reply_markup=cancel_kb)
     await InfoStates.next()
 
 
-@dp.message_handler(content_types=['photo'], state=InfoStates.info_photo_screen)
+@dp.message_handler(content_types=ContentType.PHOTO, state=InfoStates.info_photo_screen)
 async def set_household(message: types.Message, state: FSMContext):
+    if message.media_group_id:
+        return await message.answer('Отправте только одно фото')
     await state.update_data(photo_screen=message.photo[BEST_RESOLUTION]['file_id'])
     await message.answer('Отправьте фото с масками и антисептиками', reply_markup=cancel_kb)
     await InfoStates.next()
 
 
-@dp.message_handler(content_types=['photo'], state=InfoStates.info_photo_household_goods)
+@dp.message_handler(content_types=ContentType.PHOTO, state=InfoStates.info_photo_household_goods)
 async def save_household(message: types.Message, state: FSMContext):
+    if message.media_group_id:
+        return await message.answer('Отправте только одно фото')
     await state.update_data(photo_household=message.photo[BEST_RESOLUTION]['file_id'])
     await InfoStates.next()
     return await info_finish(user_id=message.from_user.id, state=state)

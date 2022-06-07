@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, exists, select, text,or_
+from sqlalchemy import create_engine, exists, or_
 from models import users, technique, new_shop, info_open, meta
 from sqlalchemy.orm import sessionmaker
 from encryption import create_hash, decode_hash
@@ -28,8 +28,8 @@ async def get_user_id(username):
 async def add_user(user_id, user_name):
     if await check_user(user_id) is False:
         ins = users.insert().values(
-        user_id=user_id,
-        user_name=user_name,
+            user_id=user_id,
+            user_name=user_name,
         )
         conn.execute(ins)
 
@@ -97,44 +97,48 @@ async def select_users(status):
 
 async def search_task_list(user_id):
     user_status = await user_status_check(user_id)
-    if user_status == 4:
-        result_new_shop = session.query(new_shop.c.address, new_shop.c.id)\
-            .where(or_(new_shop.c.status_goods == 0, new_shop.c.status_hg == 0))\
-            .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
-    elif user_status in [2, 5, 6]:
-        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_goods == 0)\
-                                             .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
-    elif user_status in [3, 7, 8]:
-        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_hg == 0)\
-                                          .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
     result_info = session.query(info_open.c.address, info_open.c.id)\
         .where(info_open.c.status == 0)\
         .filter(info_open.c.accesses_user.ilike(f'%{user_status}%')).all()
     result_technique = session.query(technique.c.address, technique.c.id)\
         .where(technique.c.status == 0)\
         .filter(technique.c.accesses_user.ilike(f'%{user_status}%')).all()
-    return result_technique, result_new_shop, result_info
+    if user_status == 4:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id)\
+            .where(or_(new_shop.c.status_goods == 0, new_shop.c.status_hg == 0))\
+            .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+        return result_technique, result_new_shop, result_info
+    elif user_status in [2, 5, 6]:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_goods == 0)\
+                                             .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+        return result_technique, result_new_shop, result_info
+    elif user_status in [3, 7, 8]:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_hg == 0)\
+                                          .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+        return result_technique, result_new_shop, result_info
 
 
 async def search_completed_task_list(user_id):
     user_status = await user_status_check(user_id)
-    if user_status == 4:
-        result_new_shop = session.query(new_shop.c.address, new_shop.c.id)\
-            .where(or_(new_shop.c.status_goods == 1, new_shop.c.status_hg == 1))\
-            .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
-    elif user_status in [2, 5, 6]:
-        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_goods == 1)\
-                                             .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
-    elif user_status in [3, 7, 8]:
-        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_hg == 1)\
-                                          .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
     result_info = session.query(info_open.c.address, info_open.c.id)\
         .where(info_open.c.status == 1)\
         .filter(info_open.c.accesses_user.ilike(f'%{user_status}%')).all()
     result_technique = session.query(technique.c.address, technique.c.id)\
         .where(technique.c.status == 1)\
         .filter(technique.c.accesses_user.ilike(f'%{user_status}%')).all()
-    return result_technique, result_new_shop, result_info
+    if user_status == 4:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id)\
+            .where(or_(new_shop.c.status_goods == 1, new_shop.c.status_hg == 1))\
+            .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+        return result_technique, result_new_shop, result_info
+    elif user_status in [2, 5, 6]:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_goods == 1)\
+                                             .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+        return result_technique, result_new_shop, result_info
+    elif user_status in [3, 7, 8]:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_hg == 1)\
+                                          .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+        return result_technique, result_new_shop, result_info
 
 
 async def search_description(table, task_id, user_id):
@@ -167,7 +171,7 @@ async def search_description(table, task_id, user_id):
             else:
                 answer += '[Товары с СПб]'
         answer += (f'Магазин: {result["address"]}\n'
-                  f'Планируемая дата открытия: {result["open_date"]}\n')
+                   f'Планируемая дата открытия: {result["open_date"]}\n')
         if result["hg_entity"] and result["hg_date"] and result['status_hg'] == 0:
             answer += (f'Требуются хозяйственные товары для {result["hg_entity"]}'
                        f' к {result["hg_date"]}\n')
@@ -193,8 +197,8 @@ async def search_description(table, task_id, user_id):
                   f'Описание: {result["description"]}\n\n')
         if result["entity"] and result["area"]:
             answer += (f'Данные для QR кода:\n'
-                      f'Юр.лицо:{result["entity"]}\n'
-                      f'Площадь торгового зала:{result["area"]}\n')
+                       f'Юр.лицо:{result["entity"]}\n'
+                       f'Площадь торгового зала:{result["area"]}\n')
         if result["passport_1"] and result["snils_1"]:
             answer += (f'Информация о сотруднике:\n'
                        f'Паспорт: {decode_hash(result["passport_1"])}\n'
