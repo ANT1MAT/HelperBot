@@ -8,9 +8,6 @@ from handler.start import start_message
 from buttons.menu_buttons import stock_kb
 
 
-USER_STATUS = 4
-
-
 @dp.callback_query_handler(lambda c: c.data == 'technique')
 async def set_stock(callback_query: types.callback_query):
     await bot.answer_callback_query(callback_query.id)
@@ -80,7 +77,11 @@ async def save_data(callback_query: types.callback_query, state: FSMContext):
     data = await state.get_data()
     await save_technique(data)
     await bot.send_message(callback_query.from_user.id, 'Товар записан')
-    users = await select_users([USER_STATUS])
+    if data.get('stock') == 'stock_msk':
+        users_status = [2, 4, 6]
+    else:
+        users_status = [2, 4, 5]
+    users = await select_users(users_status)
     for user in users:
         await bot.send_message(user, data['answer'])
     await state.finish()

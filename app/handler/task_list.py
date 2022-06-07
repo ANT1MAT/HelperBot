@@ -2,10 +2,10 @@ from aiogram import types
 from bot import dp, bot, cancel_kb
 from aiogram.dispatcher import FSMContext
 from states.task_list_states import TaskList
-from buttons.task_list_buttons import task_kb, completed_task_kb
+from buttons.task_list_buttons import task_kb, completed_task_kb, close_hg, return_hg, close_goods, return_goods, cancel
 from database_query import search_task_list, search_description, change_task_query, search_completed_task_list,\
     get_user_id
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup
 from aiogram.types.input_media import InputMediaPhoto
 from handler.start import start_message
 
@@ -89,7 +89,8 @@ async def task_description(message: types.Message, state: FSMContext):
         table = data.get(message.text)['table_name']
         task_id = data.get(message.text)['id']
         await state.update_data(complete_task={'table_name': table, 'id': task_id})
-        result, status, photo, user = await search_description(table, task_id)
+        result, status, photo, user = await search_description(table, task_id, message.from_user.id)
+        print(status)
         await state.update_data(created_task_use=user)
         await state.update_data(message=result)
         await message.answer(result)
@@ -98,6 +99,18 @@ async def task_description(message: types.Message, state: FSMContext):
             for p in photo:
                 media.append(InputMediaPhoto(p))
             await bot.send_media_group(message.from_user.id, media)
+        if type(status) is dict:
+            keyboard = InlineKeyboardMarkup(row_width=2)
+            if status.get('status_hg') == 0:
+                keyboard.add(close_hg)
+            if status.get('status_hg') == 1:
+                keyboard.add(return_hg)
+            if status.get('status_goods') == 0:
+                keyboard.add(close_goods)
+            if status.get('status_goods') == 1:
+                keyboard.add(return_goods)
+            keyboard.add(cancel)
+            return await message.answer(status, reply_markup=keyboard)
         if status == 0:
             await message.answer('Что делаем дальше?', reply_markup=task_kb)
         else:
@@ -129,7 +142,7 @@ async def return_to_work_task(callback_query: types.callback_query, state: FSMCo
     data = await state.get_data()
     table = data['complete_task']['table_name']
     task_id = data['complete_task']['id']
-    await change_task_query(table, task_id, 0)
+    await change_task_query(table, task_id, 0, callback_query.from_user.username)
     await state.finish()
     await bot.send_message(callback_query.from_user.id, 'Задача возвращена в работу')
     await start_message(message=callback_query)
@@ -141,4 +154,35 @@ async def return_to_start(callback_query: types.callback_query, state: FSMContex
     await state.finish()
     return await start_message(callback_query)
 
+
+@dp.callback_query_handler(lambda c: c.data == 'return_hg' or c.data == 'return_goods', state=TaskList.view_task)
+async def return_new_shop_task(callback_query: types.callback_query, state: FSMContext):
+    await bot.answer_callback_query(callback_query.id)
+    data = await state.get_data()
+    table = data['complete_task']['table_name']
+    task_id = data['complete_task']['id']
+    if callback_query.data == 'return_goods':
+        status_name = 'status_goods'
+    else:
+        status_name = 'status_hg'
+    await change_task_query(table, task_id, 0, callback_query.from_user.username, status_name)
+    await state.finish()
+    await bot.send_message(callback_query.from_user.id, 'Задача возвращена в работу')
+    await start_message(message=callback_query)
+
+
+@dp.callback_query_handler(lambda c: c.data == 'close_hg' or c.data == 'close_goods', state=TaskList.view_task)
+async def close_new_shop_task(callback_query: types.callback_query, state: FSMContext):
+    await bot.answer_callback_query(callback_query.id)
+    data = await state.get_data()
+    table = data['complete_task']['table_name']
+    task_id = data['complete_task']['id']
+    if callback_query.data == 'close_goods':
+        status_name = 'status_goods'
+    else:
+        status_name = 'status_hg'
+    await change_task_query(table, task_id, 1, callback_query.from_user.username, status_name)
+    await state.finish()
+    await bot.send_message(callback_query.from_user.id, 'Задача закрыта')
+    await start_message(message=callback_query)
 

@@ -3,6 +3,15 @@ from sqlalchemy import Table, Column, Integer, String, MetaData
 
 meta = MetaData()
 
+#1 = ТМ
+#2 = склад все
+#3 = хозка вся
+#4 = админ
+#5 = склад спб
+#6 = склад мск
+#7 = хозка спб
+#8 = хозка мск
+
 
 technique = Table(
     'technique', meta,
@@ -57,12 +66,14 @@ new_shop = Table(
     Column('hg_entity', String),
     Column('hg_date', String),
     Column('hg_schedule', String),
+    Column('status_hg', Integer),
     Column('goods_date', String),
-    Column('status', Integer),
+    Column('status_goods', Integer),
     Column('accesses_user', String),
     Column('stock_hg', String),
     Column('stock_goods', String),
     Column('created_task_user', String),
-    Column('closed_task_user', String)
+    Column('closed_task_hg_user', String),
+    Column('closed_task_goods_user', String),
 )
 

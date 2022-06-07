@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, exists, select, text
+from sqlalchemy import create_engine, exists, select, text,or_
 from models import users, technique, new_shop, info_open, meta
 from sqlalchemy.orm import sessionmaker
 from encryption import create_hash, decode_hash
@@ -52,8 +52,9 @@ async def save_new_shop(data: dict):
         open_date=data.get('open_date'),
         hg_entity=data.get('hg_entity'),
         hg_date=data.get('hg_date'),
+        status_hg=0,
         goods_date=data.get('goods_date'),
-        status=0,
+        status_goods=0,
         accesses_user=repr(data.get('status'))[1:-1],
         stock_hg=data.get('stock_hg'),
         stock_goods=data.get('stock_goods'),
@@ -95,10 +96,18 @@ async def select_users(status):
 
 
 async def search_task_list(user_id):
-    user_status = session.query(users.c.accesses_user).where(users.c.user_id == user_id).all()[0][0]
-    result_new_shop = session.query(new_shop.c.address, new_shop.c.id)\
-        .where(new_shop.c.status == 0)\
-        .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+    user_status = await user_status_check(user_id)
+    if user_status == 4:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id)\
+            .where(or_(new_shop.c.status_goods == 0, new_shop.c.status_hg == 0))\
+            .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+    elif user_status in [2, 5, 6]:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_goods == 0)\
+                                             .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+    elif user_status in [3, 7, 8]:
+        print(123)
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_hg == 0)\
+                                          .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
     result_info = session.query(info_open.c.address, info_open.c.id)\
         .where(info_open.c.status == 0)\
         .filter(info_open.c.accesses_user.ilike(f'%{user_status}%')).all()
@@ -109,10 +118,17 @@ async def search_task_list(user_id):
 
 
 async def search_completed_task_list(user_id):
-    user_status = session.query(users.c.accesses_user).where(users.c.user_id == user_id).all()[0][0]
-    result_new_shop = session.query(new_shop.c.address, new_shop.c.id)\
-        .where(new_shop.c.status == 1)\
-        .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+    user_status = await user_status_check(user_id)
+    if user_status == 4:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id)\
+            .where(or_(new_shop.c.status_goods == 1, new_shop.c.status_hg == 1))\
+            .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+    elif user_status in [2, 5, 6]:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_goods == 1)\
+                                             .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
+    elif user_status in [3, 7, 8]:
+        result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_hg == 1)\
+                                          .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
     result_info = session.query(info_open.c.address, info_open.c.id)\
         .where(info_open.c.status == 1)\
         .filter(info_open.c.accesses_user.ilike(f'%{user_status}%')).all()
@@ -122,7 +138,7 @@ async def search_completed_task_list(user_id):
     return result_technique, result_new_shop, result_info
 
 
-async def search_description(table, task_id):
+async def search_description(table, task_id, user_id):
     if table == 'technique':
         result = session.query(technique).where(technique.c.id == task_id).all()[0]
         answer = ''
@@ -135,31 +151,42 @@ async def search_description(table, task_id):
         for i, prod in enumerate(products, start=1):
             answer += f'{i}. {prod}\n'
         answer += f'Задачу создал @{result["created_task_user"]}\n'
-        #if result['status'] == 1:
-            #answer += f'Задачу'
         return answer, result['status'], None, result['created_task_user']
     elif table == 'new_shop':
+        status = dict()
+        user_status = await user_status_check(user_id)
         answer = ''
         result = session.query(new_shop).where(new_shop.c.id == task_id).all()[0]
-        if result['stock_hg']:
+        if result['stock_hg'] and result['status_hg'] == 0:
             if result['stock_hg'] == 'stock_msk':
                 answer += '[Хозка с МСК]'
             else:
                 answer += '[Хозка с СПб]'
-        if result['stock_goods']:
+        if result['stock_goods'] and result['status_goods'] == 0:
             if result['stock_goods'] == 'stock_msk':
                 answer += '[Товары с МСК]'
             else:
                 answer += '[Товары с СПб]'
         answer += (f'Магазин: {result["address"]}\n'
                   f'Планируемая дата открытия: {result["open_date"]}\n')
-        if result["hg_entity"] and result["hg_date"]:
+        if result["hg_entity"] and result["hg_date"] and result['status_hg'] == 0:
             answer += (f'Требуются хозяйственные товары для {result["hg_entity"]}'
                        f' к {result["hg_date"]}\n')
-        if result["goods_date"]:
+        else:
+            answer += f'Хозяйственные товары уже подготовлены\n'
+        if result["goods_date"] and result['status_goods'] == 0:
             answer += f'Требуется товар к {result["goods_date"]}\n'
+        else:
+            answer += f'Товар уже подготовлен\n'
         answer += f'Задачу создал @{result["created_task_user"]}\n'
-        return answer, result['status'], None, result['created_task_user']
+        if user_status in [2, 4, 5, 6]:
+            status.update({'status_goods': result['status_goods']})
+            print(1)
+        if user_status in [3, 4, 7, 8]:
+            print(2)
+            status.update({'status_hg': result['status_hg']})
+
+        return answer, status, None, result['created_task_user']
     elif table == 'info':
         result = session.query(info_open).where(info_open.c.id == task_id).all()[0]
         answer = (f'{result["address"]} будет открыт '
@@ -187,14 +214,14 @@ async def search_description(table, task_id):
         return answer, result['status'], None, result['created_task_user']
 
 
-async def change_task_query(table, task_id, status, user_name=None):
+async def change_task_query(table, task_id, status, user_name=None, status_name=None):
     if table == 'technique':
         session.query(technique).where(technique.c.id == task_id).update({'status': status,
                                                                           'closed_task_user': user_name})
         session.commit()
     elif table == 'new_shop':
-        session.query(new_shop).where(new_shop.c.id == task_id).update({'status': status,
-                                                                        'closed_task_user': user_name})
+        session.query(new_shop).where(new_shop.c.id == task_id).update({status_name: status,
+                                                                        'closed_task_hg_user': user_name})
         session.commit()
     elif table == 'info':
         session.query(info_open).where(info_open.c.id == task_id).update({'status': status,
