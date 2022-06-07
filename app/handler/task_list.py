@@ -90,7 +90,6 @@ async def task_description(message: types.Message, state: FSMContext):
         task_id = data.get(message.text)['id']
         await state.update_data(complete_task={'table_name': table, 'id': task_id})
         result, status, photo, user = await search_description(table, task_id, message.from_user.id)
-        print(status)
         await state.update_data(created_task_use=user)
         await state.update_data(message=result)
         await message.answer(result)
@@ -110,7 +109,7 @@ async def task_description(message: types.Message, state: FSMContext):
             if status.get('status_goods') == 1:
                 keyboard.add(return_goods)
             keyboard.add(cancel)
-            return await message.answer(status, reply_markup=keyboard)
+            return await message.answer('Что делаем дальше?', reply_markup=keyboard)
         if status == 0:
             await message.answer('Что делаем дальше?', reply_markup=task_kb)
         else:

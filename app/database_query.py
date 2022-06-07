@@ -105,7 +105,6 @@ async def search_task_list(user_id):
         result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_goods == 0)\
                                              .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
     elif user_status in [3, 7, 8]:
-        print(123)
         result_new_shop = session.query(new_shop.c.address, new_shop.c.id).where(new_shop.c.status_hg == 0)\
                                           .filter(new_shop.c.accesses_user.ilike(f'%{user_status}%')).all()
     result_info = session.query(info_open.c.address, info_open.c.id)\
@@ -181,9 +180,7 @@ async def search_description(table, task_id, user_id):
         answer += f'Задачу создал @{result["created_task_user"]}\n'
         if user_status in [2, 4, 5, 6]:
             status.update({'status_goods': result['status_goods']})
-            print(1)
         if user_status in [3, 4, 7, 8]:
-            print(2)
             status.update({'status_hg': result['status_hg']})
 
         return answer, status, None, result['created_task_user']
