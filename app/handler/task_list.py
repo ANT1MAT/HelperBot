@@ -5,7 +5,7 @@ from states.task_list_states import TaskList
 from buttons.task_list_buttons import task_kb, completed_task_kb, close_hg, return_hg, close_goods, return_goods, cancel
 from database_query import search_task_list, search_description, change_task_query, search_completed_task_list,\
     get_user_id
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from aiogram.types.input_media import InputMediaPhoto
 from handler.start import start_message
 
@@ -92,7 +92,7 @@ async def task_description(message: types.Message, state: FSMContext):
         result, status, photo, user = await search_description(table, task_id, message.from_user.id)
         await state.update_data(created_task_use=user)
         await state.update_data(message=result)
-        await message.answer(result)
+        await message.answer(result, reply_markup=ReplyKeyboardRemove())
         if photo:
             media = []
             for p in photo:
